@@ -1,8 +1,5 @@
 package org.example;
-
-import com.lowagie.text.pdf.PdfReader;
 import eu.europa.esig.dss.enumerations.DigestAlgorithm;
-import eu.europa.esig.dss.enumerations.CertificationPermission;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignaturePackaging;
 import eu.europa.esig.dss.model.DSSDocument;
@@ -70,7 +67,7 @@ public class PdfSignService {
         }
 
         DSSDocument documentToSign = new FileDocument(inputPdfPath.toFile());
-        PAdESSignatureParameters parameters = buildSignatureParameters(inputPdfPath, signatureRequest);
+        PAdESSignatureParameters parameters = buildSignatureParameters(signatureRequest);
 
         try (Pkcs12SignatureToken signingToken = new Pkcs12SignatureToken(
                 pfxPath.toFile(),
@@ -88,7 +85,7 @@ public class PdfSignService {
         }
     }
 
-    private static PAdESSignatureParameters buildSignatureParameters(Path inputPdfPath, SignatureRequest signatureRequest) throws IOException {
+    private static PAdESSignatureParameters buildSignatureParameters(SignatureRequest signatureRequest) {
         PAdESSignatureParameters parameters = new PAdESSignatureParameters();
         parameters.setDigestAlgorithm(DigestAlgorithm.SHA256);
         parameters.setSignaturePackaging(SignaturePackaging.ENVELOPED);
@@ -97,21 +94,17 @@ public class PdfSignService {
         parameters.setReason(signatureRequest.reason());
         parameters.setLocation(signatureRequest.location());
         parameters.setContactInfo(buildContactInfo(signatureRequest));
-        if (signatureRequest.certificationPermission() != null) {
-            parameters.setPermission(signatureRequest.certificationPermission());
-        }
         if (signatureRequest.signatureImagePath() != null) {
-            parameters.setImageParameters(buildImageParameters(inputPdfPath, signatureRequest));
+            parameters.setImageParameters(buildImageParameters(signatureRequest));
         }
         return parameters;
     }
 
-    private static SignatureImageParameters buildImageParameters(Path inputPdfPath, SignatureRequest signatureRequest) throws IOException {
-        int targetPage = resolveImagePage(inputPdfPath, signatureRequest.imagePage());
+    private static SignatureImageParameters buildImageParameters(SignatureRequest signatureRequest) {
         SignatureFieldParameters fieldParameters = new SignatureFieldParameters();
-        fieldParameters.setPage(targetPage);
+        fieldParameters.setPage(signatureRequest.imagePage());
         fieldParameters.setOriginX(signatureRequest.imageOriginX());
-        fieldParameters.setOriginY(resolveImageOriginY(inputPdfPath, targetPage, signatureRequest));
+        fieldParameters.setOriginY(signatureRequest.imageOriginY());
         fieldParameters.setWidth(signatureRequest.imageWidth());
         fieldParameters.setHeight(signatureRequest.imageHeight());
 
@@ -119,24 +112,6 @@ public class PdfSignService {
         imageParameters.setImage(new FileDocument(signatureRequest.signatureImagePath().toFile()));
         imageParameters.setFieldParameters(fieldParameters);
         return imageParameters;
-    }
-
-    private static int resolveImagePage(Path inputPdfPath, int configuredPage) throws IOException {
-        if (configuredPage > 0) {
-            return configuredPage;
-        }
-        try (PdfReader reader = new PdfReader(inputPdfPath.toString())) {
-            return reader.getNumberOfPages();
-        }
-    }
-
-    private static float resolveImageOriginY(Path inputPdfPath, int page, SignatureRequest signatureRequest) throws IOException {
-        if (signatureRequest.imageOriginY() >= 0) {
-            return signatureRequest.imageOriginY();
-        }
-        try (PdfReader reader = new PdfReader(inputPdfPath.toString())) {
-            return reader.getPageSize(page).getHeight() - signatureRequest.imageFooterMargin() - signatureRequest.imageHeight();
-        }
     }
 
     private static String buildContactInfo(SignatureRequest signatureRequest) {
@@ -198,14 +173,12 @@ public class PdfSignService {
             String location,
             String evidenceId,
             byte[] bioSignatureBytes,
-            CertificationPermission certificationPermission,
             Path signatureImagePath,
             int imagePage,
             float imageOriginX,
             float imageOriginY,
             float imageWidth,
-            float imageHeight,
-            float imageFooterMargin
+            float imageHeight
     ) {
     }
 }

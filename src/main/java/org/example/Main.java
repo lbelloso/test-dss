@@ -1,7 +1,5 @@
 package org.example;
 
-import eu.europa.esig.dss.enumerations.CertificationPermission;
-
 import java.nio.file.Path;
 import java.util.Base64;
 
@@ -33,14 +31,12 @@ public class Main {
                 "Valencia - Consulta",
                 "evidencia-paciente-001",
                 patientBioSignatureBytes,
-                null,
                 patientSignatureImagePath,
-                -1,
+                1,
                 36,
-                -1,
+                742,
                 120,
-                50,
-                24
+                50
         );
         PdfSignService.SignatureRequest doctorSignature = new PdfSignService.SignatureRequest(
                 "Doctor",
@@ -48,14 +44,12 @@ public class Main {
                 "Valencia - Consulta",
                 "evidencia-doctor-001",
                 doctorBioSignatureBytes,
-                null,
                 doctorSignatureImagePath,
-                -1,
+                1,
                 180,
-                -1,
+                742,
                 120,
-                50,
-                24
+                50
         );
         PdfSignService.SignatureRequest thirdSignature = new PdfSignService.SignatureRequest(
                 "Firmante prueba",
@@ -63,14 +57,12 @@ public class Main {
                 "Valencia - Consulta",
                 "evidencia-prueba-001",
                 thirdBioSignatureBytes,
-                null,
                 thirdSignatureImagePath,
-                -1,
+                1,
                 324,
-                -1,
+                742,
                 120,
-                50,
-                24
+                50
         );
 
         Path patientGeneratedPath = service.signPdfWithPfx(
