@@ -1,6 +1,7 @@
 package org.example;
 
 import eu.europa.esig.dss.enumerations.DigestAlgorithm;
+import eu.europa.esig.dss.enumerations.CertificationPermission;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.enumerations.SignaturePackaging;
 import eu.europa.esig.dss.model.DSSDocument;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.Objects;
 
 public class PdfSignService {
+    private static final String BIO_SIGNATURE_PREFIX = "biofirma-b64:";
+    private static final String EVIDENCE_ID_PREFIX = "evidencia-id:";
 
     private final PAdESService padesService;
 
@@ -38,12 +41,14 @@ public class PdfSignService {
         this.padesService.setTspSource(tspSource);
     }
 
-    public Path signPdfWithPfx(Path inputPdfPath, Path outputPdfPath, Path pfxPath, char[] pfxPassword, byte[] bioSignatureBytes) throws IOException {
+    public Path signPdfWithPfx(Path inputPdfPath, Path outputPdfPath, Path pfxPath, char[] pfxPassword, SignatureRequest signatureRequest) throws IOException {
         Objects.requireNonNull(inputPdfPath, "inputPdfPath no puede ser null");
         Objects.requireNonNull(outputPdfPath, "outputPdfPath no puede ser null");
         Objects.requireNonNull(pfxPath, "pfxPath no puede ser null");
         Objects.requireNonNull(pfxPassword, "pfxPassword no puede ser null");
-        Objects.requireNonNull(bioSignatureBytes, "bioSignatureBytes no puede ser null");
+        Objects.requireNonNull(signatureRequest, "signatureRequest no puede ser null");
+        Objects.requireNonNull(signatureRequest.bioSignatureBytes(), "bioSignatureBytes no puede ser null");
+        Objects.requireNonNull(signatureRequest.evidenceId(), "evidenceId no puede ser null");
 
         if (!Files.exists(inputPdfPath)) {
             throw new IllegalArgumentException("No existe el PDF de entrada: " + inputPdfPath);
@@ -51,12 +56,15 @@ public class PdfSignService {
         if (!Files.exists(pfxPath)) {
             throw new IllegalArgumentException("No existe el certificado PFX: " + pfxPath);
         }
-        if (bioSignatureBytes.length == 0) {
+        if (signatureRequest.bioSignatureBytes().length == 0) {
             throw new IllegalArgumentException("La biofirma de prueba no puede estar vacia.");
+        }
+        if (signatureRequest.evidenceId().isBlank()) {
+            throw new IllegalArgumentException("El evidenciaId no puede estar vacio.");
         }
 
         DSSDocument documentToSign = new FileDocument(inputPdfPath.toFile());
-        PAdESSignatureParameters parameters = buildSignatureParameters(bioSignatureBytes);
+        PAdESSignatureParameters parameters = buildSignatureParameters(signatureRequest);
 
         try (Pkcs12SignatureToken signingToken = new Pkcs12SignatureToken(
                 pfxPath.toFile(),
@@ -74,15 +82,24 @@ public class PdfSignService {
         }
     }
 
-    private static PAdESSignatureParameters buildSignatureParameters(byte[] bioSignatureBytes) {
+    private static PAdESSignatureParameters buildSignatureParameters(SignatureRequest signatureRequest) {
         PAdESSignatureParameters parameters = new PAdESSignatureParameters();
         parameters.setDigestAlgorithm(DigestAlgorithm.SHA256);
         parameters.setSignaturePackaging(SignaturePackaging.ENVELOPED);
         parameters.setSignatureLevel(SignatureLevel.PAdES_BASELINE_T);
-        parameters.setReason("Aprobacion contractual de prueba");
-        parameters.setLocation("Valencia - Oficina Central");
-        parameters.setContactInfo("biofirma-b64:" + Base64.getEncoder().encodeToString(bioSignatureBytes));
+        parameters.setSignerName(signatureRequest.signerName());
+        parameters.setReason(signatureRequest.reason());
+        parameters.setLocation(signatureRequest.location());
+        parameters.setContactInfo(buildContactInfo(signatureRequest));
+        if (signatureRequest.certificationPermission() != null) {
+            parameters.setPermission(signatureRequest.certificationPermission());
+        }
         return parameters;
+    }
+
+    private static String buildContactInfo(SignatureRequest signatureRequest) {
+        return EVIDENCE_ID_PREFIX + signatureRequest.evidenceId()
+                + ";" + BIO_SIGNATURE_PREFIX + Base64.getEncoder().encodeToString(signatureRequest.bioSignatureBytes());
     }
 
     private static DSSPrivateKeyEntry getFirstPrivateKey(List<DSSPrivateKeyEntry> keys) {
@@ -131,5 +148,15 @@ public class PdfSignService {
             return clean + "tsr";
         }
         return clean + "/tsr";
+    }
+
+    public record SignatureRequest(
+            String signerName,
+            String reason,
+            String location,
+            String evidenceId,
+            byte[] bioSignatureBytes,
+            CertificationPermission certificationPermission
+    ) {
     }
 }
